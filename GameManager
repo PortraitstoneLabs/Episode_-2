@@ -1,0 +1,206 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class GameManager : MonoBehaviour
+{
+    public GameObject stonePrefab;
+    public GameObject stickPrefab;
+    public Text scoreText;
+    public Text stonesText;
+    public Text levelText;
+    public Text highscoreText;
+
+    public GameObject menuPanel;
+    public GameObject startPanel;
+    public GameObject levelDonePanel;
+    public GameObject gameOverPanel;
+
+    public GameObject[] levels;
+
+    // singleton pattern
+    public static GameManager Instance { get; private set; }
+
+    public enum State { MENU, INIT, START, LEVELDONE, LOADINGLEVEL, GAMEOVER }
+    State _state;
+    GameObject _steadyStone;
+    GameObject _steadyLevel;
+    bool _isSwitchingState;
+
+    //propfull + Tab * 2
+    private int _score;
+
+    public int Score
+    {
+        get { return _score; }
+        set
+        {
+            _score = value;
+            scoreText.text = "SCORE: " + _score;
+        }
+    }
+
+    private int _level;
+
+    public int Level
+    {
+        get { return _level; }
+        set
+        {
+            _level = value;
+            levelText.text = "LEVEL: " + _level;
+        }
+    }
+
+    private int _stone;
+
+    public int Stone
+    {
+        get { return _stone; }
+        set
+        {
+            _stone = value;
+            stonesText.text = "STONES: " + _stone;
+        }
+    }
+    public void StartClicked()
+    {
+        SwitchState(State.INIT);
+    }
+    void Start()
+    {
+        Instance = this;
+        SwitchState(State.MENU);
+        PlayerPrefs.DeleteKey("highscore");
+    }
+
+    public void SwitchState(State newState, float delay = 0)
+    {
+        StartCoroutine(SwitchDelay(newState, delay));
+    }
+
+    //coroutine
+    IEnumerator SwitchDelay(State newState, float delay)
+    {
+        _isSwitchingState = true;
+        yield return new WaitForSeconds(delay);
+        EndState();
+        _state = newState;
+        StartState(newState);
+        _isSwitchingState = false;
+    }
+
+    void StartState(State newState)
+    {
+        switch (newState) //Ctrl + .
+        {
+            case State.MENU:
+                Cursor.visible = true;
+                highscoreText.text = "HIGHSCORE: " + PlayerPrefs.GetInt("highscore");
+                menuPanel.SetActive(true);
+                break;
+            case State.INIT:
+                Cursor.visible = false;
+                startPanel.SetActive(true);
+                Score = 0;
+                Level = 0;
+                Stone = 2;
+                if (_steadyLevel != null)
+                {
+                    Destroy(_steadyLevel);
+                }
+                Instantiate(stickPrefab);
+                SwitchState(State.LOADINGLEVEL);
+                break;
+            case State.START:
+                break;
+            case State.LEVELDONE:
+                Destroy(_steadyStone);
+                Destroy(_steadyLevel);
+                Level++;
+                levelDonePanel.SetActive(true);
+                SwitchState(State.LOADINGLEVEL, 0.5f);
+                break;
+            case State.LOADINGLEVEL:
+                if (Level >= levels.Length)
+                {
+                    SwitchState(State.GAMEOVER);
+                }
+                else
+                {
+                    _steadyLevel = Instantiate(levels[Level]);
+                    SwitchState(State.START);
+                }
+                break;
+            case State.GAMEOVER:
+                if (Score > PlayerPrefs.GetInt("highscore"))
+                {
+                    PlayerPrefs.SetInt("highscore", Score);
+                }
+                gameOverPanel.SetActive(true);
+                break;
+        }
+    }
+
+    void Update()
+    {
+        switch (_state)
+        {
+            case State.MENU:
+                break;
+            case State.INIT:
+                break;
+            case State.START:
+                if (_steadyStone == null)
+                {
+                    if (Stone > 0)
+                    {
+                        _steadyStone = Instantiate(stonePrefab);
+                    }
+                    else
+                    {
+                        SwitchState(State.GAMEOVER);
+                    }
+                }
+                if (_steadyLevel != null && _steadyLevel.transform.childCount == 0 && !_isSwitchingState)
+                {
+                    SwitchState(State.LEVELDONE);
+                }
+                break;
+            case State.LEVELDONE:
+                break;
+            case State.LOADINGLEVEL:
+                break;
+            case State.GAMEOVER:
+                if (Input.anyKeyDown)
+                {
+                    SwitchState(State.MENU);
+                }
+                break;
+        }
+    }
+
+    void EndState()
+    {
+        switch (_state)
+        {
+            case State.MENU:
+                menuPanel.SetActive(false);
+                break;
+            case State.INIT:
+                break;
+            case State.START:
+                break;
+            case State.LEVELDONE:
+                levelDonePanel.SetActive(false);
+                break;
+            case State.LOADINGLEVEL:
+                break;
+            case State.GAMEOVER:
+                startPanel.SetActive(false);
+                gameOverPanel.SetActive(false);
+                break;
+        }
+    }
+}
